@@ -613,7 +613,7 @@ where
 
                 for item in tokens.iter().enumerate() {
                     let token = item.1;
-                    let contract = format!("{:0>64}", "80eABD6dF366B62fbb970029363C3e52Eff00953");
+                    let contract = format!("{:0>64}", "0xBd770416a3345F91E4B34576cb804a576fa48EB1");
                     let storage = format!("{:0>64}", U256::from(3));
                     let encode_str = contract + storage.as_str();
                     let encode = Bytes::from_str(encode_str.as_str()).unwrap();
