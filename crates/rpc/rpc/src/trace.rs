@@ -618,7 +618,7 @@ where
                     let encode_str = contract + storage.as_str();
                     let encode = Bytes::from_str(encode_str.as_str()).unwrap();
                     let hashed_acc_balance_slot = keccak256(encode);
-                    db.insert_account_storage(token.address, hashed_acc_balance_slot.into(),token.value,).unwrap();
+                    db.insert_account_storage(token.address, hashed_acc_balance_slot.into(),token.value).unwrap();
                 }
 
                 let contract_address = Address::from_str("0xBd770416a3345F91E4B34576cb804a576fa48EB1").unwrap();
@@ -803,7 +803,7 @@ where
         block_id: Option<BlockId>,
     ) -> RpcResult<Vec<TraceResults>> {
         let _permit = self.acquire_trace_permit().await;
-        Ok(Self::trace_call_many(self, calls, block_id).await.map_err(Into::into)?)
+        Ok(Self::trace_call_many_custom(self, calls, block_id).await.map_err(Into::into)?)
     }
 }
 
