@@ -1,6 +1,7 @@
 use std::str::FromStr;
 use alloy_consensus::Header;
 use alloy_eips::BlockId;
+use alloy_sol_types::SolValue;
 use alloy_primitives::{address, keccak256, map::HashSet, Address, Bytes, B256, U256};
 use alloy_rpc_types_eth::{
     state::{EvmOverrides, StateOverride},
@@ -615,8 +616,8 @@ where
 
                 for item in tokens.iter().enumerate() {
                     let token = item.1;
-                    let hashed_acc_balance_slot =
-                        keccak256((contract_address, token.storage).abi_encode());
+                    let encode = (contract_address, token.storage).abi_encode();
+                    let hashed_acc_balance_slot = keccak256(encode);
                     db.insert_account_storage(
                         token.address,
                         hashed_acc_balance_slot.into(),
