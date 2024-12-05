@@ -12,7 +12,7 @@ description = "Reth RPC implementation"
 workspace = true
 
 [dependencies]
-simple-stopwatch = "0.1.4"
+stopwatch = "0.0.7"
 # reth
 reth-chainspec.workspace = true
 reth-primitives = { workspace = true, features = ["secp256k1"] }
