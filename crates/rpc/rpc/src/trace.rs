@@ -662,9 +662,9 @@ where
                         f.push(*b);
                     }
 
-                    let g = Bytes::from(f);
-
                     while let Some((mut call, trace_types)) = calls.next() {
+
+                        let g = Bytes::from(f.clone());
 
                         let h = TransactionInput
                         {
