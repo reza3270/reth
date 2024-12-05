@@ -37,7 +37,7 @@ use revm_inspectors::{
 use std::sync::Arc;
 use revm_primitives::Bytecode;
 use tokio::sync::{AcquireError, OwnedSemaphorePermit};
-use simple_stopwatch::Stopwatch;
+use stopwatch::Stopwatch;
 
 /// `trace` API implementation.
 ///
