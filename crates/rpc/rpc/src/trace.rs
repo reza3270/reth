@@ -1,7 +1,6 @@
 use std::str::FromStr;
 use alloy_consensus::Header;
 use alloy_eips::BlockId;
-use alloy_sol_types::SolValue;
 use alloy_primitives::{address, keccak256, map::HashSet, Address, Bytes, B256, U256};
 use alloy_rpc_types_eth::{
     state::{EvmOverrides, StateOverride},
