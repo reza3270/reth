@@ -1,6 +1,7 @@
+use std::str::FromStr;
 use alloy_consensus::Header;
 use alloy_eips::BlockId;
-use alloy_primitives::{map::HashSet, Bytes, B256, U256};
+use alloy_primitives::{address, keccak256, map::HashSet, Address, Bytes, B256, U256};
 use alloy_rpc_types_eth::{
     state::{EvmOverrides, StateOverride},
     transaction::TransactionRequest,
@@ -34,6 +35,7 @@ use revm_inspectors::{
     tracing::{parity::populate_state_diff, TracingInspector, TracingInspectorConfig},
 };
 use std::sync::Arc;
+use revm_primitives::Bytecode;
 use tokio::sync::{AcquireError, OwnedSemaphorePermit};
 
 /// `trace` API implementation.
@@ -41,6 +43,12 @@ use tokio::sync::{AcquireError, OwnedSemaphorePermit};
 /// This type provides the functionality for handling `trace` related requests.
 pub struct TraceApi<Provider, Eth> {
     inner: Arc<TraceApiInner<Provider, Eth>>,
+}
+
+pub struct Token {
+    pub address: Address,
+    pub storage: U256,
+    pub value: U256,
 }
 
 // === impl TraceApi ===
@@ -560,6 +568,106 @@ where
         }
         traces
     }
+
+    /// Performs multiple call traces on top of the same block. i.e. transaction n will be executed
+    /// on top of a pending block with all n-1 transactions applied (traced) first.
+    ///
+    /// Note: Allows tracing dependent transactions, hence all transactions are traced in sequence
+    pub async fn trace_call_many_custom(
+        &self,
+        calls: Vec<(TransactionRequest, HashSet<TraceType>)>,
+        block_id: Option<BlockId>,
+    ) -> Result<Vec<TraceResults>, Eth::Error> {
+        let at = block_id.unwrap_or(BlockId::pending());
+        let (cfg, block_env, at) = self.eth_api().evm_env_at(at).await?;
+
+        let this = self.clone();
+        // execute all transactions on top of each other and record the traces
+        self.eth_api()
+            .spawn_with_state_at_block(at, move |state| {
+                let mut results = Vec::with_capacity(calls.len());
+                let mut db = CacheDB::new(StateProviderDatabase::new(state));
+
+                let contract_address = Address::from_str("0xBd770416a3345F91E4B34576cb804a576fa48EB1".as_str()).unwrap();
+
+                let tokens: [Token; 4] = [
+                    Token {
+                        address: address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
+                        storage: U256::from(3),
+                        value: U256::from_str("1_000_000_000_000_000_000_000").unwrap(),
+                    }, // weth
+                    Token {
+                        address: address!("6b175474e89094c44da98b954eedeac495271d0f"),
+                        storage: U256::from(2),
+                        value: U256::from_str("1_000_000_000_000_000_000_000_000").unwrap(),
+                    }, // dai
+                    Token {
+                        address: address!("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
+                        storage: U256::from(9),
+                        value: U256::from_str("100_000_000_000_000").unwrap(),
+                    }, // usdc
+                    Token {
+                        address: address!("dac17f958d2ee523a2206206994597c13d831ec7"),
+                        storage: U256::from(2),
+                        value: U256::from_str("100_000_000_000_000").unwrap(),
+                    }, // usdt
+                ];
+
+                for item in tokens.iter().enumerate() {
+                    let token = item.1;
+                    let hashed_acc_balance_slot =
+                        keccak256((contract_address, token.storage).abi_encode());
+                    db.insert_account_storage(
+                        token.address,
+                        hashed_acc_balance_slot.into(),
+                        token.value,
+                    )
+                        .unwrap();
+                }
+
+                let db_account = db.load_account(contract_address).unwrap();
+                let acc_info = &mut db_account.info.clone();
+
+                acc_info.code = Some(Bytecode::LegacyRaw(
+                    Bytes::from_str("0x0").unwrap(),
+                ));
+
+                db.insert_account_info(contract_address, acc_info.clone());
+
+                let mut calls = calls.into_iter().peekable();
+
+                while let Some((call, trace_types)) = calls.next() {
+                    let env = this.eth_api().prepare_call_env(
+                        cfg.clone(),
+                        block_env.clone(),
+                        call,
+                        &mut db,
+                        Default::default(),
+                    )?;
+                    let config = TracingInspectorConfig::from_parity_config(&trace_types);
+                    let mut inspector = TracingInspector::new(config);
+                    let (res, _) = this.eth_api().inspect(&mut db, env, &mut inspector)?;
+
+                    let trace_res = inspector
+                        .into_parity_builder()
+                        .into_trace_results_with_state(&res, &trace_types, &db)
+                        .map_err(Eth::Error::from_eth_err)?;
+
+                    results.push(trace_res);
+
+                    // need to apply the state changes of this call before executing the
+                    // next call
+                    if calls.peek().is_some() {
+                        // need to apply the state changes of this call before executing
+                        // the next call
+                        db.commit(res.state)
+                    }
+                }
+
+                Ok(results)
+            })
+            .await
+    }
 }
 
 #[async_trait]
@@ -688,6 +796,16 @@ where
     async fn trace_block_opcode_gas(&self, block_id: BlockId) -> RpcResult<Option<BlockOpcodeGas>> {
         let _permit = self.acquire_trace_permit().await;
         Ok(Self::trace_block_opcode_gas(self, block_id).await.map_err(Into::into)?)
+    }
+
+    /// Handler for `trace_callManyCustom`
+    async fn trace_call_many_custom(
+        &self,
+        calls: Vec<(TransactionRequest, HashSet<TraceType>)>,
+        block_id: Option<BlockId>,
+    ) -> RpcResult<Vec<TraceResults>> {
+        let _permit = self.acquire_trace_permit().await;
+        Ok(Self::trace_call_many(self, calls, block_id).await.map_err(Into::into)?)
     }
 }
 

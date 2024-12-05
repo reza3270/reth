@@ -108,4 +108,14 @@ pub trait TraceApi {
     /// This is the same as `trace_transactionOpcodeGas` but for all transactions in a block.
     #[method(name = "blockOpcodeGas")]
     async fn trace_block_opcode_gas(&self, block_id: BlockId) -> RpcResult<Option<BlockOpcodeGas>>;
+
+    /// Performs multiple call traces on top of the same block. i.e. transaction n will be executed
+    /// on top of a pending block with all n-1 transactions applied (traced) first. Allows to trace
+    /// dependent transactions.
+    #[method(name = "callManyCustom")]
+    async fn trace_call_many_custom(
+        &self,
+        calls: Vec<(TransactionRequest, HashSet<TraceType>)>,
+        block_id: Option<BlockId>,
+    ) -> RpcResult<Vec<TraceResults>>;
 }
