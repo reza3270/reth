@@ -589,8 +589,6 @@ where
                 let mut results = Vec::with_capacity(calls.len());
                 let mut db = CacheDB::new(StateProviderDatabase::new(state));
 
-                let contract_address = Address::from_str("0xBd770416a3345F91E4B34576cb804a576fa48EB1").unwrap();
-
                 let tokens: [Token; 4] = [
                     Token {
                         address: address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
@@ -616,7 +614,10 @@ where
 
                 for item in tokens.iter().enumerate() {
                     let token = item.1;
-                    let encode = (contract_address, token.storage).abi_encode();
+                    let contract = format!("{:0>64}", "80eABD6dF366B62fbb970029363C3e52Eff00953");
+                    let storage = format!("{:0>64}", U256::from(3));
+                    let encode_str = contract + storage.as_str();
+                    let encode = Bytes::from_str(encode_str.as_str()).unwrap();
                     let hashed_acc_balance_slot = keccak256(encode);
                     db.insert_account_storage(
                         token.address,
@@ -625,6 +626,8 @@ where
                     )
                         .unwrap();
                 }
+
+                let contract_address = Address::from_str("0xBd770416a3345F91E4B34576cb804a576fa48EB1").unwrap();
 
                 let db_account = db.load_account(contract_address).unwrap();
                 let acc_info = &mut db_account.info.clone();
