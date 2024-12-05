@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use alloy_consensus::Header;
 use alloy_eips::BlockId;
-use alloy_sol_types::SolValue;
+use alloy_rpc_types::SolValue;
 use alloy_primitives::{address, keccak256, map::HashSet, Address, Bytes, B256, U256};
 use alloy_rpc_types_eth::{
     state::{EvmOverrides, StateOverride},
@@ -589,7 +589,7 @@ where
                 let mut results = Vec::with_capacity(calls.len());
                 let mut db = CacheDB::new(StateProviderDatabase::new(state));
 
-                let contract_address = Address::from_str("0xBd770416a3345F91E4B34576cb804a576fa48EB1".as_str()).unwrap();
+                let contract_address = Address::from_str("0xBd770416a3345F91E4B34576cb804a576fa48EB1").unwrap();
 
                 let tokens: [Token; 4] = [
                     Token {
